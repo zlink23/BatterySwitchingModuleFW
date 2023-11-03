@@ -1,0 +1,13 @@
+../Core/Src/main.c:76:5:main	3
+../Core/Src/main.c:146:6:SystemClock_Config	4
+../Core/Src/main.c:201:13:MX_ADC1_Init	3
+../Core/Src/main.c:253:13:MX_SPI1_Init	2
+../Core/Src/main.c:293:13:MX_GPIO_Init	1
+../Core/Src/main.c:363:6:reverse	2
+../Core/Src/main.c:374:5:intToStr	3
+../Core/Src/main.c:391:6:ftoa	2
+../Core/Src/main.c:414:6:process_SD_card	4
+../Core/Src/main.c:486:6:process_SD_card1	4
+../Core/Src/main.c:558:6:Measurement_of_ADC_Voltage_18650	3
+../Core/Src/main.c:600:6:ADC_Select_Voltage18650	2
+../Core/Src/main.c:614:6:Error_Handler	1
