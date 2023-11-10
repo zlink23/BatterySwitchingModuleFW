@@ -12,7 +12,7 @@
   * This software is licensed under terms that can be found in the LICENSE file
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
+  * Latest 11/09
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "stdio.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,8 +61,11 @@ void process_SD_card1( void );
 void ADC_Select_Voltage18650(void);
 void Measurement_of_ADC_Voltage_18650();
 
-float V_18650 = -1;
-float V_CMOS = -1;
+float V_18650 = 0.0f;
+float V_CMOS = 0.0f;
+float C_CMOS = 0.0f;
+float C_18650 = 0.0f;
+unsigned int seconds_since_start;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -109,9 +113,8 @@ int main(void)
   while (1)
   {
 	  Measurement_of_ADC_Voltage_18650();
+	  seconds_since_start++;
 	  process_SD_card();
-	  HAL_Delay(100);
-	  process_SD_card1();
 
 	  if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_SET)
 	  	  	  {
@@ -360,68 +363,18 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void reverse(char* str, int len)
-{
-    int i = 0, j = len - 1, temp;
-    while (i < j) {
-        temp = str[i];
-        str[i] = str[j];
-        str[j] = temp;
-        i++;
-        j--;
-    }
-}
-int intToStr(int x, char str[], int d)
-{
-    int i = 0;
-    while (x) {
-        str[i++] = (x % 10) + '0';
-        x = x / 10;
-    }
-
-    // If number of digits required is more, then
-    // add 0s at the beginning
-    while (i < d)
-        str[i++] = '0';
-
-    reverse(str, i);
-    str[i] = '\0';
-    return i;
-}
-void ftoa(float n, char* res, int afterpoint)
-{
-    // Extract integer part
-    int ipart = (int)n;
-
-    // Extract floating part
-    float fpart = n - (float)ipart;
-
-    // convert integer part to string
-    int i = intToStr(ipart, res, 0);
-
-    // check for display option after point
-    if (afterpoint != 0) {
-        res[i] = '.'; // add dot
-
-        // Get the value of fraction part upto given no.
-        // of points after dot. The third parameter
-        // is needed to handle cases like 233.007
-        fpart = fpart * pow(10, afterpoint);
-
-        intToStr((int)fpart, res + i + 1, afterpoint);
-    }
-}
 void process_SD_card( void )
 {
   FATFS       FatFs;                //Fatfs handle
   FIL         fil;                  //File handle
   FRESULT     fres;                 //Result after operations
-  char        buf[100];
-  //Measurement_of_ADC_Voltage_18650();
-  char res[20];
-  float n = V_18650;
-  float o = V_CMOS;
-  ftoa(n, res, 3);
+
+  char buf[100];
+  char res_18650[7];
+  char res_C18650[7];
+  char res_CCMOS[9];
+  char res_CMOS[7];
+  char res_time[32];
 
   do
   {
@@ -442,7 +395,7 @@ void process_SD_card( void )
     freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
     //printf("TotalSpace : %lu bytes, FreeSpace = %lu bytes\n", totalSpace, freeSpace);
     //Open the file
-    fres = f_open(&fil, "Readings.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+    fres = f_open(&fil, "TestingReadings.csv", FA_WRITE | FA_READ | FA_OPEN_APPEND);
     if(fres != FR_OK)
     {
       //printf("File creation/open Error : (%i)\r\n", fres);
@@ -450,19 +403,32 @@ void process_SD_card( void )
     }
     //printf("Writing data!!!\r\n");
     //write the data
-    f_puts("Voltage Readings-\n", &fil);
-    f_puts("18650:", &fil);
-    f_puts(res, &fil);
-    f_puts("\nCMOS: \n",&fil);
+
+    //Write the Time for each write
+    sprintf(res_time,"%u,", seconds_since_start);
+    f_puts(res_time, &fil);
+
+    //Write the 18650 Voltage Readings
+    sprintf(res_18650, "%.3f,", V_18650);
+    f_puts(res_18650, &fil);
+
+    //Write the 18650 Current Readings
+    sprintf(res_C18650, "%.3f,", C_18650);
+    f_puts(res_C18650, &fil);
+
+    //Write the CMOS Voltage Readings
+    sprintf(res_CMOS, "%.3f,", V_CMOS);
+    f_puts(res_CMOS,&fil);
+
+    //Write the 18650 Current Readings
+    sprintf(res_CCMOS, "%.3f, \n", C_CMOS);
+    f_puts(res_CCMOS, &fil);
+
+
+
     //close your file
     f_close(&fil);
     //Open the file
-    fres = f_open(&fil, "Readings.txt", FA_READ);
-    if(fres != FR_OK)
-    {
-      //printf("File opening Error : (%i)\r\n", fres);
-      break;
-    }
     //read the data
     f_gets(buf, sizeof(buf), &fil);
     //printf("Read Data : %s\n", buf);
@@ -483,77 +449,6 @@ void process_SD_card( void )
   //printf("SD Card Unmounted Successfully!!!\r\n");
 }
 
-void process_SD_card1( void )
-{
-  FATFS       FatFs;                //Fatfs handle
-  FIL         fil;                  //File handle
-  FRESULT     fres;                 //Result after operations
-  char        buf[100];
-  //Measurement_of_ADC_Voltage_18650();
-  char res[20];
-  float n = 0.00;
-  float o = V_CMOS;
-  ftoa(n, res, 3);
-
-  do
-  {
-    //Mount the SD Card
-    fres = f_mount(&FatFs, "", 1);    //1=mount now
-    if (fres != FR_OK)
-    {
-      //printf("No SD Card found : (%i)\r\n", fres);
-      break;
-    }
-    //printf("SD Card Mounted Successfully!!!\r\n");
-    //Read the SD Card Total size and Free Size
-    FATFS *pfs;
-    DWORD fre_clust;
-    uint32_t totalSpace, freeSpace;
-    f_getfree("", &fre_clust, &pfs);
-    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
-    //printf("TotalSpace : %lu bytes, FreeSpace = %lu bytes\n", totalSpace, freeSpace);
-    //Open the file
-    fres = f_open(&fil, "Readings1.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
-    if(fres != FR_OK)
-    {
-      //printf("File creation/open Error : (%i)\r\n", fres);
-      break;
-    }
-    //printf("Writing data!!!\r\n");
-    //write the data
-    f_puts("Voltage Readings-\n", &fil);
-    f_puts("18650:", &fil);
-    f_puts(res, &fil);
-    f_puts("\nCMOS: \n",&fil);
-    //close your file
-    f_close(&fil);
-    //Open the file
-    fres = f_open(&fil, "Readings.txt", FA_READ);
-    if(fres != FR_OK)
-    {
-      //printf("File opening Error : (%i)\r\n", fres);
-      break;
-    }
-    //read the data
-    f_gets(buf, sizeof(buf), &fil);
-    //printf("Read Data : %s\n", buf);
-    //close your file
-    f_close(&fil);
-    //printf("Closing File!!!\r\n");
-#if 0
-    //Delete the file.
-    fres = f_unlink(Readings.txt);
-    if (fres != FR_OK)
-    {
-      //printf("Cannot able to delete the file\n");
-    }
-#endif
-  } while(0);
-  //We're done, so de-mount the drive
-  f_mount(NULL, "", 0);
-  //printf("SD Card Unmounted Successfully!!!\r\n");
-}
 
 void Measurement_of_ADC_Voltage_18650(){
 	float V_ref = 3.3;  // This is known for each micro controller from data
@@ -583,7 +478,7 @@ void Measurement_of_ADC_Voltage_18650(){
 	           // pass to buffer
 	           // SD_write(time, voltage, current)
 	           /* Check if the value corresponds to 3.3V */
-	           if (V_18650 > 3.0)  // Slight tolerance might be needed depending on
+	           if (V_18650 > 2.0)  // Slight tolerance might be needed depending on
                    // your application's accuracy requirements.
 	           {
    /* Turn ON the B_18650_LoadSwitch_Pin */
