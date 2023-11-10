@@ -63,10 +63,10 @@ void Error_Handler(void);
 #define SD_CardDetect_Input_GPIO_Port GPIOC
 #define SD_CardDetect_Output_Pin GPIO_PIN_3
 #define SD_CardDetect_Output_GPIO_Port GPIOC
-#define Voltage_ADC_CMOS_Pin GPIO_PIN_2
-#define Voltage_ADC_CMOS_GPIO_Port GPIOA
 #define Voltage_ADC_18650_Pin GPIO_PIN_3
 #define Voltage_ADC_18650_GPIO_Port GPIOA
+#define Voltage_ADC_CMOS_Pin GPIO_PIN_1
+#define Voltage_ADC_CMOS_GPIO_Port GPIOB
 #define Load_Switch_CMOS_Pin GPIO_PIN_10
 #define Load_Switch_CMOS_GPIO_Port GPIOB
 #define Load_Switch_18650_Pin GPIO_PIN_11

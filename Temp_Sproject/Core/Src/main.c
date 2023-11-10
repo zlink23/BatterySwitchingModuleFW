@@ -59,7 +59,9 @@ static void MX_ADC1_Init(void);
 void process_SD_card( void );
 void process_SD_card1( void );
 void ADC_Select_Voltage18650(void);
+void ADC_Select_VoltageCMOS(void);
 void Measurement_of_ADC_Voltage_18650();
+void Measurement_of_ADC_Voltage_CMOS();
 
 float V_18650 = 0.0f;
 float V_CMOS = 0.0f;
@@ -113,6 +115,7 @@ int main(void)
   while (1)
   {
 	  Measurement_of_ADC_Voltage_18650();
+	  Measurement_of_ADC_Voltage_CMOS();
 	  seconds_since_start++;
 	  process_SD_card();
 
@@ -127,13 +130,13 @@ int main(void)
 	  	  }
 
 	  //Testing Load Switch at 2 seconds
-	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
-	  	HAL_Delay(3000);
-	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
-
-	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
-	  	HAL_Delay(3000);
-	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
+//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
+//	  	HAL_Delay(3000);
+//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
+//
+//	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
+//	  	HAL_Delay(3000);
+//	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
 
     /* USER CODE END WHILE */
 
@@ -208,7 +211,7 @@ static void MX_ADC1_Init(void)
 
   /* USER CODE END ADC1_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
+  //ADC_ChannelConfTypeDef sConfig = {0};
 
   /* USER CODE BEGIN ADC1_Init 1 */
 
@@ -219,13 +222,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 2;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -235,13 +238,21 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+//  sConfig.Channel = ADC_CHANNEL_3;
+//  sConfig.Rank = ADC_REGULAR_RANK_1;
+//  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+//  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
+//
+//  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+//  */
+//  sConfig.Rank = ADC_REGULAR_RANK_2;
+//  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+//  {
+//    Error_Handler();
+//  }
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
@@ -303,8 +314,8 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_RESET);
@@ -492,13 +503,69 @@ void Measurement_of_ADC_Voltage_18650(){
 	    HAL_ADC_Stop(&hadc1);
 }
 
+void Measurement_of_ADC_Voltage_CMOS(){
+	float V_ref = 3.3;  // This is known for each micro controller from data
+		// sheet, V_ref = power supply in
+		float ADC_resolution = (4096 - 1);  // 2^12 - 1
+		float V_stepSize = V_ref / ADC_resolution;
+		// ADC
+
+		//char msg[20];
+
+
+	    /* Start ADC Conversion for ADC1 */
+	    ADC_Select_VoltageCMOS();
+	    HAL_ADC_Start(&hadc1);
+	    uint16_t rawValue1;
+	       if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
+	           /* Read the ADC1 value */
+	           rawValue1 = HAL_ADC_GetValue(&hadc1);
+	           // write a current get and map the voltage to a current
+//	           sprintf("%f", (int)rawValue1);
+//	           HAL_UART_Transmit(&hlpuart1, (uint16_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+
+	           V_CMOS = rawValue1 * V_stepSize;  // You might want to use a different name
+	                                        // for this variable
+	           // write to sD card
+	           // pass to buffer
+	           // SD_write(time, voltage, current)
+	           /* Check if the value corresponds to 3.3V */
+	           if (V_CMOS < 2.0)  // Slight tolerance might be needed depending on
+                   // your application's accuracy requirements.
+	           {
+   /* Turn ON the B_18650_LoadSwitch_Pin */
+	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_SET);
+	           } else {
+   /* Turn OFF the B_18650_LoadSwitch_Pin */
+	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
+	           }
+	       }
+
+	    HAL_ADC_Stop(&hadc1);
+}
+
+
 void ADC_Select_Voltage18650(void){
 ADC_ChannelConfTypeDef sConfig = {0};
 sConfig.Channel = ADC_CHANNEL_3;
+sConfig.Rank = 1;
+sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
 if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
 {
   Error_Handler();
 }
+}
+
+void ADC_Select_VoltageCMOS(void){
+ADC_ChannelConfTypeDef sConfig = {0};
+sConfig.Channel = ADC_CHANNEL_9;
+sConfig.Rank = 1;
+sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+ if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+ {
+   Error_Handler();
+ }
 }
 /* USER CODE END 4 */
 
