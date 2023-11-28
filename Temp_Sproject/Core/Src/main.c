@@ -60,19 +60,29 @@ void process_SD_card( void );
 void process_SD_card1( void );
 void ADC_Select_Voltage18650(void);
 void ADC_Select_VoltageCMOS(void);
+void ADC_Select_Current18650(void);
+void ADC_Select_CurrentCMOS(void);
 void Measurement_of_ADC_Voltage_18650();
 void Measurement_of_ADC_Voltage_CMOS();
+void Measurement_of_ADC_Current_CMOS();
+void Measurement_of_ADC_Current_18650();
 
 float V_18650 = 0.0f;
 float V_CMOS = 0.0f;
 float C_CMOS = 0.0f;
 float C_18650 = 0.0f;
 unsigned int seconds_since_start;
+
+//array of current values
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+typedef enum { State_CMOS, State_18650 } StateMachine;
 
+StateMachine state = State_CMOS;
 /* USER CODE END 0 */
 
 /**
@@ -114,29 +124,63 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  Measurement_of_ADC_Voltage_18650();
-	  Measurement_of_ADC_Voltage_CMOS();
-	  seconds_since_start++;
-	  process_SD_card();
-
+	  Measurement_of_ADC_Current_CMOS();
+	  Measurement_of_ADC_Current_18650();
 	  if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_SET)
-	  	  	  {
-		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET);
-	  	  	  }
+	  {
+		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET); //error light is OFF and ready to run
+		  // HAL_GPIO_WritePin(SD_CardDetect_Output_ReadyToRun_GPIO_Port, SD_CardDetect_Output_ReadyToRun__Pin, GPIO_PIN_SET); //ready light is ON ready to run
+	  if (C_CMOS <= 1.5) {
+	              // if(Voltage_Current_Read)
+	              state = State_CMOS;  // 18650 Mode >= 20mA //1
+	          } else {
+	              state = State_18650;  // Cmos Mode > //2
+	          }
 
-	  	  else if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_RESET) {
-	  		HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_RESET);
-	  		HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
-	  	  }
 
-	  //Testing Load Switch at 2 seconds
-//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
-//	  	HAL_Delay(3000);
-//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
+
+	  switch (state) {
+	              case State_CMOS: {  //1
+	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
+	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
+	                  break;
+	              }
+
+	              case State_18650: { //2
+	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
+	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
+	                  break;
+	              }
+	          }
+	  }
+
+//	  Measurement_of_ADC_Voltage_18650();
+//	  Measurement_of_ADC_Voltage_CMOS();
+//	  Measurement_of_ADC_Current_CMOS();
+//	  Measurement_of_ADC_Current_18650();
 //
+//	  seconds_since_start++;
+//	  process_SD_card();
+//
+//	  if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_SET)
+//	  	  	  {
+//		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET);
+//	  	  	  }
+//
+//	  	  else if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_RESET) {
+//	  		HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_RESET);
+//	  		HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
+//	  	  }
+//
+//	  //Testing Load Switch at 2 seconds
+//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
+//	  	HAL_Delay(2000);
+//	  	HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
+//	  	HAL_Delay(500);
 //	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
-//	  	HAL_Delay(3000);
+//	  	HAL_Delay(2000);
 //	  	HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
+//	  	HAL_Delay(500);
 
     /* USER CODE END WHILE */
 
@@ -211,8 +255,6 @@ static void MX_ADC1_Init(void)
 
   /* USER CODE END ADC1_Init 0 */
 
-  //ADC_ChannelConfTypeDef sConfig = {0};
-
   /* USER CODE BEGIN ADC1_Init 1 */
 
   /* USER CODE END ADC1_Init 1 */
@@ -235,27 +277,6 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-//  sConfig.Channel = ADC_CHANNEL_3;
-//  sConfig.Rank = ADC_REGULAR_RANK_1;
-//  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-//  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-//  {
-//    Error_Handler();
-//  }
-//
-//  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-//  */
-//  sConfig.Rank = ADC_REGULAR_RANK_2;
-//  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-//  {
-//    Error_Handler();
-//  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
 
 }
 
@@ -398,12 +419,12 @@ void process_SD_card( void )
     }
     //printf("SD Card Mounted Successfully!!!\r\n");
     //Read the SD Card Total size and Free Size
-    FATFS *pfs;
-    DWORD fre_clust;
-    uint32_t totalSpace, freeSpace;
-    f_getfree("", &fre_clust, &pfs);
-    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+//    FATFS *pfs;
+//    DWORD fre_clust;
+//    uint32_t totalSpace, freeSpace;
+//    f_getfree("", &fre_clust, &pfs);
+//    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+//    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
     //printf("TotalSpace : %lu bytes, FreeSpace = %lu bytes\n", totalSpace, freeSpace);
     //Open the file
     fres = f_open(&fil, "TestingReadings.csv", FA_WRITE | FA_READ | FA_OPEN_APPEND);
@@ -416,23 +437,23 @@ void process_SD_card( void )
     //write the data
 
     //Write the Time for each write
-    sprintf(res_time,"%u,", seconds_since_start);
+    sprintf(res_time,"%u,", seconds_since_start); //Position A
     f_puts(res_time, &fil);
 
     //Write the 18650 Voltage Readings
-    sprintf(res_18650, "%.3f,", V_18650);
+    sprintf(res_18650, "%.3f,", V_18650); //Position B
     f_puts(res_18650, &fil);
 
     //Write the 18650 Current Readings
-    sprintf(res_C18650, "%.3f,", C_18650);
+    sprintf(res_C18650, "%.3f,", C_18650); //Position C
     f_puts(res_C18650, &fil);
 
     //Write the CMOS Voltage Readings
-    sprintf(res_CMOS, "%.3f,", V_CMOS);
+    sprintf(res_CMOS, "%.3f,", V_CMOS); //Position D
     f_puts(res_CMOS,&fil);
 
-    //Write the 18650 Current Readings
-    sprintf(res_CCMOS, "%.3f, \n", C_CMOS);
+    //Write the CMOS Current Readings
+    sprintf(res_CCMOS, "%.3f, \n", C_CMOS); //Position E
     f_puts(res_CCMOS, &fil);
 
 
@@ -467,10 +488,6 @@ void Measurement_of_ADC_Voltage_18650(){
 		float ADC_resolution = (4096 - 1);  // 2^12 - 1
 		float V_stepSize = V_ref / ADC_resolution;
 		// ADC
-
-		//char msg[20];
-
-
 	    /* Start ADC Conversion for ADC1 */
 	    ADC_Select_Voltage18650();
 	    HAL_ADC_Start(&hadc1);
@@ -478,28 +495,8 @@ void Measurement_of_ADC_Voltage_18650(){
 	       if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
 	           /* Read the ADC1 value */
 	           rawValue1 = HAL_ADC_GetValue(&hadc1);
-	           // write a current get and map the voltage to a current
-//	           sprintf("%f", (int)rawValue1);
-//	           HAL_UART_Transmit(&hlpuart1, (uint16_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-
-	           V_18650 = rawValue1 * V_stepSize;  // You might want to use a different name
-	                                        // for this variable
-	           // write to sD card
-	           // pass to buffer
-	           // SD_write(time, voltage, current)
-	           /* Check if the value corresponds to 3.3V */
-	           if (V_18650 > 2.0)  // Slight tolerance might be needed depending on
-                   // your application's accuracy requirements.
-	           {
-   /* Turn ON the B_18650_LoadSwitch_Pin */
-	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_SET);
-	           } else {
-   /* Turn OFF the B_18650_LoadSwitch_Pin */
-	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
-	           }
+	           V_18650 = rawValue1 * V_stepSize;  //
 	       }
-
 	    HAL_ADC_Stop(&hadc1);
 }
 
@@ -509,10 +506,6 @@ void Measurement_of_ADC_Voltage_CMOS(){
 		float ADC_resolution = (4096 - 1);  // 2^12 - 1
 		float V_stepSize = V_ref / ADC_resolution;
 		// ADC
-
-		//char msg[20];
-
-
 	    /* Start ADC Conversion for ADC1 */
 	    ADC_Select_VoltageCMOS();
 	    HAL_ADC_Start(&hadc1);
@@ -520,31 +513,46 @@ void Measurement_of_ADC_Voltage_CMOS(){
 	       if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
 	           /* Read the ADC1 value */
 	           rawValue1 = HAL_ADC_GetValue(&hadc1);
-	           // write a current get and map the voltage to a current
-//	           sprintf("%f", (int)rawValue1);
-//	           HAL_UART_Transmit(&hlpuart1, (uint16_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-
-	           V_CMOS = rawValue1 * V_stepSize;  // You might want to use a different name
-	                                        // for this variable
-	           // write to sD card
-	           // pass to buffer
-	           // SD_write(time, voltage, current)
-	           /* Check if the value corresponds to 3.3V */
-	           if (V_CMOS < 2.0)  // Slight tolerance might be needed depending on
-                   // your application's accuracy requirements.
-	           {
-   /* Turn ON the B_18650_LoadSwitch_Pin */
-	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_SET);
-	           } else {
-   /* Turn OFF the B_18650_LoadSwitch_Pin */
-	        	   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
-	           }
+	           V_CMOS = rawValue1 * V_stepSize;
 	       }
-
 	    HAL_ADC_Stop(&hadc1);
 }
 
+void Measurement_of_ADC_Current_CMOS(){
+	float V_ref = 3.3;  // This is known for each micro controller from data
+		// sheet, V_ref = power supply in
+		float ADC_resolution = (4096 - 1);  // 2^12 - 1
+		float V_stepSize = V_ref / ADC_resolution;
+		// ADC
+	    /* Start ADC Conversion for ADC1 */
+	    ADC_Select_CurrentCMOS();
+	    HAL_ADC_Start(&hadc1);
+	    uint16_t rawValue1;
+	       if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
+	           /* Read the ADC1 value */
+	           rawValue1 = HAL_ADC_GetValue(&hadc1);
+	           C_CMOS = rawValue1 * V_stepSize;
+	       }
+	    HAL_ADC_Stop(&hadc1);
+}
+
+void Measurement_of_ADC_Current_18650(){
+	float V_ref = 3.3;  // This is known for each micro controller from data
+		// sheet, V_ref = power supply in
+		float ADC_resolution = (4096 - 1);  // 2^12 - 1
+		float V_stepSize = V_ref / ADC_resolution;
+		// ADC
+	    /* Start ADC Conversion for ADC1 */
+	    ADC_Select_Current18650();
+	    HAL_ADC_Start(&hadc1);
+	    uint16_t rawValue1;
+	       if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
+	           /* Read the ADC1 value */
+	           rawValue1 = HAL_ADC_GetValue(&hadc1);
+	           C_18650 = rawValue1 * V_stepSize;
+	       }
+	    HAL_ADC_Stop(&hadc1);
+}
 
 void ADC_Select_Voltage18650(void){
 ADC_ChannelConfTypeDef sConfig = {0};
@@ -566,6 +574,28 @@ sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
  {
    Error_Handler();
  }
+}
+
+void ADC_Select_Current18650(void){
+ADC_ChannelConfTypeDef sConfig = {0};
+sConfig.Channel = ADC_CHANNEL_0;
+sConfig.Rank = 1;
+sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+{
+  Error_Handler();
+}
+}
+
+void ADC_Select_CurrentCMOS(void){
+ADC_ChannelConfTypeDef sConfig = {0};
+sConfig.Channel = ADC_CHANNEL_8;
+sConfig.Rank = 1;
+sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+{
+  Error_Handler();
+}
 }
 /* USER CODE END 4 */
 
