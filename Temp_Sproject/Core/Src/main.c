@@ -124,17 +124,18 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  Measurement_of_ADC_Current_CMOS();
-	  Measurement_of_ADC_Current_18650();
+	  process_SD_card();
 	  if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_SET)
 	  {
 		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET); //error light is OFF and ready to run
 		  // HAL_GPIO_WritePin(SD_CardDetect_Output_ReadyToRun_GPIO_Port, SD_CardDetect_Output_ReadyToRun__Pin, GPIO_PIN_SET); //ready light is ON ready to run
-	  if (C_CMOS <= 1.5) {
+	  if (state == State_CMOS) {
 	              // if(Voltage_Current_Read)
-	              state = State_CMOS;  // 18650 Mode >= 20mA //1
-	          } else {
-	              state = State_18650;  // Cmos Mode > //2
+		  	 	 if(C_CMOS >= 1.5)
+		  	 		 state = State_18650;  // 18650 Mode >= 20mA //1
+	          } else if(state == State_18650){
+	        	  if(C_CMOS <= 1.0)
+	              state = State_CMOS;  // Cmos Mode > //2
 	          }
 
 
@@ -143,12 +144,17 @@ int main(void)
 	              case State_CMOS: {  //1
 	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
 	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
+	            	  Measurement_of_ADC_Current_CMOS();
+	            	  Measurement_of_ADC_Voltage_CMOS();
 	                  break;
 	              }
 
 	              case State_18650: { //2
 	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
 	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
+	            	  Measurement_of_ADC_Current_18650();
+	            	  Measurement_of_ADC_Voltage_18650();
+	            	  Measurement_of_ADC_Current_CMOS();
 	                  break;
 	              }
 	          }
@@ -255,6 +261,8 @@ static void MX_ADC1_Init(void)
 
   /* USER CODE END ADC1_Init 0 */
 
+  ADC_ChannelConfTypeDef sConfig = {0};
+
   /* USER CODE BEGIN ADC1_Init 1 */
 
   /* USER CODE END ADC1_Init 1 */
@@ -277,6 +285,27 @@ static void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
 
 }
 
@@ -332,11 +361,9 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_RESET);
@@ -345,16 +372,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOG, GPIO_PIN_0, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, Load_Switch_CMOS_Pin|Load_Switch_18650_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : SD_Write_Button_Pin */
-  GPIO_InitStruct.Pin = SD_Write_Button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(SD_Write_Button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : SD_CardDetect_Input_Pin */
   GPIO_InitStruct.Pin = SD_CardDetect_Input_Pin;
@@ -375,13 +393,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PG0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Load_Switch_CMOS_Pin Load_Switch_18650_Pin */
   GPIO_InitStruct.Pin = Load_Switch_CMOS_Pin|Load_Switch_18650_Pin;

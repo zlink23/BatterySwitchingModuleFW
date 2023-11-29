@@ -57,8 +57,6 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define SD_Write_Button_Pin GPIO_PIN_10
-#define SD_Write_Button_GPIO_Port GPIOF
 #define SD_CardDetect_Input_Pin GPIO_PIN_0
 #define SD_CardDetect_Input_GPIO_Port GPIOC
 #define SD_CardDetect_Output_Pin GPIO_PIN_3
