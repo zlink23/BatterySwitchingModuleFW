@@ -71,6 +71,7 @@ float V_18650 = 0.0f;
 float V_CMOS = 0.0f;
 float C_CMOS = 0.0f;
 float C_18650 = 0.0f;
+unsigned int Switch_State = 0;
 unsigned int seconds_since_start;
 
 //array of current values
@@ -80,7 +81,7 @@ unsigned int seconds_since_start;
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-typedef enum { State_CMOS, State_18650 } StateMachine;
+typedef enum { State_CMOS, State_18650 } StateMachine; //State 0 = State_CMOS State 1 = State_18650
 
 StateMachine state = State_CMOS;
 /* USER CODE END 0 */
@@ -125,40 +126,49 @@ int main(void)
   while (1)
   {
 	  process_SD_card();
+	  seconds_since_start++;
 	  if (HAL_GPIO_ReadPin(SD_CardDetect_Input_GPIO_Port, SD_CardDetect_Input_Pin) == GPIO_PIN_SET)
 	  {
-		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET); //error light is OFF and ready to run
+		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_SET);//error light is OFF and ready to run
 		  // HAL_GPIO_WritePin(SD_CardDetect_Output_ReadyToRun_GPIO_Port, SD_CardDetect_Output_ReadyToRun__Pin, GPIO_PIN_SET); //ready light is ON ready to run
 	  if (state == State_CMOS) {
 	              // if(Voltage_Current_Read)
-		  	 	 if(C_CMOS >= 1.5)
+		  	 	 if(C_CMOS >= 2.0) //threshold
 		  	 		 state = State_18650;  // 18650 Mode >= 20mA //1
 	          } else if(state == State_18650){
-	        	  if(C_CMOS <= 1.0)
+	        	  if(C_18650 <= 1.0) //threshold
 	              state = State_CMOS;  // Cmos Mode > //2
 	          }
+	  }
 
+	  else {
+		  HAL_GPIO_WritePin(SD_CardDetect_Output_GPIO_Port, SD_CardDetect_Output_Pin, GPIO_PIN_RESET);
+		  Error_Handler();
+
+	  }
 
 
 	  switch (state) {
-	              case State_CMOS: {  //1
+	              case State_CMOS: {  //0
 	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_RESET);
 	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_SET);
-	            	  Measurement_of_ADC_Current_CMOS();
 	            	  Measurement_of_ADC_Voltage_CMOS();
+	            	  Measurement_of_ADC_Current_CMOS();
+	            	  Switch_State = 0;
 	                  break;
 	              }
 
-	              case State_18650: { //2
+	              case State_18650: { //1
 	            	  HAL_GPIO_WritePin(Load_Switch_CMOS_GPIO_Port, Load_Switch_CMOS_Pin, GPIO_PIN_RESET);
 	            	  HAL_GPIO_WritePin(Load_Switch_18650_GPIO_Port, Load_Switch_18650_Pin, GPIO_PIN_SET);
 	            	  Measurement_of_ADC_Current_18650();
 	            	  Measurement_of_ADC_Voltage_18650();
-	            	  Measurement_of_ADC_Current_CMOS();
+
+	            	  Switch_State = 1;
+	            	   // temporaRY HERE FOR TEST
 	                  break;
 	              }
 	          }
-	  }
 
 //	  Measurement_of_ADC_Voltage_18650();
 //	  Measurement_of_ADC_Voltage_CMOS();
@@ -418,6 +428,7 @@ void process_SD_card( void )
   char res_CCMOS[9];
   char res_CMOS[7];
   char res_time[32];
+  char res_SwitchState[7];
 
   do
   {
@@ -464,8 +475,12 @@ void process_SD_card( void )
     f_puts(res_CMOS,&fil);
 
     //Write the CMOS Current Readings
-    sprintf(res_CCMOS, "%.3f, \n", C_CMOS); //Position E
+    sprintf(res_CCMOS, "%.3f,", C_CMOS); //Position E
     f_puts(res_CCMOS, &fil);
+
+    //Writes the Switch State, 0 = State_CMOS / 1 = State_18650
+    sprintf(res_SwitchState,"%u, \n", Switch_State); //Position F
+        f_puts(res_SwitchState, &fil);
 
 
 
@@ -515,7 +530,7 @@ void Measurement_of_ADC_Voltage_CMOS(){
 	float V_ref = 3.3;  // This is known for each micro controller from data
 		// sheet, V_ref = power supply in
 		float ADC_resolution = (4096 - 1);  // 2^12 - 1
-		float V_stepSize = V_ref / ADC_resolution;
+		float V_stepSize = V_ref / ADC_resolution; // 3.3/4095 = 0.0008V
 		// ADC
 	    /* Start ADC Conversion for ADC1 */
 	    ADC_Select_VoltageCMOS();
@@ -549,6 +564,8 @@ void Measurement_of_ADC_Current_CMOS(){
 
 void Measurement_of_ADC_Current_18650(){
 	float V_ref = 3.3;  // This is known for each micro controller from data
+	//float temp_voltage;
+
 		// sheet, V_ref = power supply in
 		float ADC_resolution = (4096 - 1);  // 2^12 - 1
 		float V_stepSize = V_ref / ADC_resolution;
@@ -561,6 +578,8 @@ void Measurement_of_ADC_Current_18650(){
 	           /* Read the ADC1 value */
 	           rawValue1 = HAL_ADC_GetValue(&hadc1);
 	           C_18650 = rawValue1 * V_stepSize;
+	           //C_CMOS = (94.3 * temp_voltage) + .008;
+
 	       }
 	    HAL_ADC_Stop(&hadc1);
 }
